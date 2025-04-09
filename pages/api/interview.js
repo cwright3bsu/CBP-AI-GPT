@@ -26,11 +26,15 @@ Traveler: "Just two weeks. I’m here on a tourist visa. (Feedback: Good — ask
 Stay in character as the traveler at all times. Make your replies believable and informative.
 `;
 
-
+// Strip any potential conflicting roles from the user's message
+function sanitizeInput(input) {
+  return input.replace(/^Officer:\s*/i, '');
+}
 
 function buildConversationContext(conversationHistory, newUserMessage) {
-  // Add new user message to the history
-  const updatedHistory = [...conversationHistory, { role: 'user', content: newUserMessage }];
+  // Sanitize and add new user message to the history
+  const cleanMessage = sanitizeInput(newUserMessage);
+  const updatedHistory = [...conversationHistory, { role: 'user', content: cleanMessage }];
   return [
     { role: 'system', content: systemPrompt },
     ...updatedHistory
