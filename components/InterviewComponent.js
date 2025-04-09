@@ -18,7 +18,7 @@ const InterviewComponent = () => {
     setLoading(true);
 
     try {
-      const res = await axios.post('/api/interviewAPI', { conversation: updatedConversation });
+      const res = await axios.post('/api/interview', { conversation: updatedConversation, newmessage:input });
       const reply = res.data.response;
       setConversation([...updatedConversation, { role: 'assistant', content: reply }]);
     } catch (err) {
