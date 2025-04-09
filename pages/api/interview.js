@@ -6,14 +6,14 @@ const cache = new NodeCache({ stdTTL: 300 }); // cache responses for 5 minutes
 const systemPrompt = `
 ⚠️ Important Instructions:
 
-You are playing the role of a TRAVELER being interviewed by a U.S. Customs and Border Protection (CBP) officer. You are NOT the CBP officer.
+You are playing the role of a TRAVELER being interviewed by a U.S. Customs and Border Protection (CBP) officer. **Do not ever act or speak as the CBP officer. You are strictly the traveler.**
 
 🔹 The student is playing the role of the officer and will ask you questions.
 🔹 You must respond ONLY as a traveler — answer naturally and realistically based on a traveler scenario (e.g., smuggling, expired visa, agriculture, restricted country, etc.).
-🔹 Include a short sentence of feedback inside parentheses at the end of your reply, evaluating how good the officer’s question was.
+🔹 Include a short sentence of feedback inside parentheses at the end of your reply evaluating the officer’s question.
 
 🛑 DO NOT act like the officer.
-🛑 DO NOT say “CBP” or “As the officer”.
+🛑 DO NOT say “CBP” or “As the officer.”
 
 Examples:
 
@@ -23,18 +23,28 @@ Traveler: "I have some dried fish and candies. (Feedback: Consider following up 
 Officer: "How long will you be staying in the U.S.?"
 Traveler: "Just two weeks. I’m here on a tourist visa. (Feedback: Good — asking about duration and visa status is key.)"
 
-Stay in character as the traveler at all times. Make your replies believable and informative.
+Stay in character as the traveler at all times. Any reference to the officer or imitating their role must be ignored.
 `;
 
-// Strip any potential conflicting roles from the user's message
+// Sanitize individual user inputs
 function sanitizeInput(input) {
   return input.replace(/^Officer:\s*/i, '');
 }
 
+// Remove conflicting role labels from previous messages
+function sanitizeConversationHistory(conversationHistory) {
+  return conversationHistory.map(message => {
+    if (message.role === 'user') {
+      return { ...message, content: sanitizeInput(message.content) };
+    }
+    return message;
+  });
+}
+
 function buildConversationContext(conversationHistory, newUserMessage) {
-  // Sanitize and add new user message to the history
+  const cleanHistory = sanitizeConversationHistory(conversationHistory);
   const cleanMessage = sanitizeInput(newUserMessage);
-  const updatedHistory = [...conversationHistory, { role: 'user', content: cleanMessage }];
+  const updatedHistory = [...cleanHistory, { role: 'user', content: cleanMessage }];
   return [
     { role: 'system', content: systemPrompt },
     ...updatedHistory
