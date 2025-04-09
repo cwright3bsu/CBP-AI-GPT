@@ -6,42 +6,39 @@ export default async function handler(req, res) {
   }
 
   const { conversation } = req.body;
-  const prompt = generateScorePrompt(conversation);
+
+  const scorePrompt = `
+You are evaluating a simulated CBP interview conducted by a student officer.
+
+Analyze the following conversation where the officer (user) questions a traveler (assistant). Provide:
+
+1. A score from 0–100 based on how well the officer identified red flags and asked relevant questions.
+2. Specific feedback about what they did well and how they can improve.
+
+Conversation:
+${conversation.map((msg) => `${msg.role === 'user' ? 'Officer' : 'Traveler'}: ${msg.content}`).join('\n')}
+`;
 
   try {
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model: "gpt-3.5-turbo",
+      model: 'gpt-3.5-turbo',
       messages: [
-        { role: "system", content: "You are an evaluation assistant scoring how well a CBP agent interviewed a traveler at the border." },
-        { role: "user", content: prompt }
+        { role: 'system', content: 'You are a CBP interview scoring assistant.' },
+        { role: 'user', content: scorePrompt }
       ],
-      temperature: 0.3
+      temperature: 0.5,
+      stream: false
     }, {
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
       }
     });
 
-    const scoreResponse = response.data.choices[0].message.content;
-    res.status(200).json({ score: scoreResponse });
+    const score = response.data.choices[0].message.content;
+    res.status(200).json({ score });
   } catch (error) {
-    console.error("Error scoring conversation:", error);
-    res.status(500).json({ error: 'Failed to score conversation' });
+    console.error('Scoring API Error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to score the conversation.' });
   }
-}
-
-function generateScorePrompt(conversation) {
-  let prompt = `Below is a transcript between a CBP officer (student) and a traveler (AI). Please review the conversation and return:
-1. A score from 0 to 100 based on how well the CBP officer identified red flags and gathered key information.
-2. Mention which important questions were asked or missed.
-3. Suggest how the officer could improve their questioning.
-
-Transcript:\n\n`;
-
-  conversation.forEach((msg) => {
-    prompt += `${msg.role === 'user' ? 'Officer' : 'Traveler'}: ${msg.content}\n`;
-  });
-
-  return prompt;
 }
