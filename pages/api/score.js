@@ -12,14 +12,13 @@ export default async function handler(req, res) {
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
       model: "gpt-3.5-turbo",
       messages: [
-         { role: "system", content: "You are a CBP interview simulator scoring module." },
-         { role: "user", content: prompt }
+        { role: "system", content: "You are an evaluation assistant scoring how well a CBP agent interviewed a traveler at the border." },
+        { role: "user", content: prompt }
       ],
-      temperature: 0.5,
-      stream: false
+      temperature: 0.3
     }, {
       headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json"
       }
     });
@@ -27,17 +26,22 @@ export default async function handler(req, res) {
     const scoreResponse = response.data.choices[0].message.content;
     res.status(200).json({ score: scoreResponse });
   } catch (error) {
-    console.error("Error scoring conversation", error);
+    console.error("Error scoring conversation:", error);
     res.status(500).json({ error: 'Failed to score conversation' });
   }
 }
 
 function generateScorePrompt(conversation) {
-  let prompt = "Please review the following CBP interview conversation and provide:\n";
-  prompt += "1. A score (0 to 100) based on the effectiveness of the interviewer's questions and the interviewee's identification of red flags.\n";
-  prompt += "2. Specific recommendations for improvement.\n\n";
+  let prompt = `Below is a transcript between a CBP officer (student) and a traveler (AI). Please review the conversation and return:
+1. A score from 0 to 100 based on how well the CBP officer identified red flags and gathered key information.
+2. Mention which important questions were asked or missed.
+3. Suggest how the officer could improve their questioning.
+
+Transcript:\n\n`;
+
   conversation.forEach((msg) => {
-    prompt += `${msg.role}: ${msg.content}\n`;
+    prompt += `${msg.role === 'user' ? 'Officer' : 'Traveler'}: ${msg.content}\n`;
   });
+
   return prompt;
 }
