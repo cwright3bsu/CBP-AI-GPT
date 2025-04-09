@@ -8,10 +8,10 @@
     "start": "next start"
   },
   "dependencies": {
-    "axios": "^0.27.2",
     "next": "latest",
-    "node-cache": "^5.1.2",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "axios": "^0.27.2",
+    "node-cache": "^5.1.2"
   }
 }
