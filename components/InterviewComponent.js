@@ -9,24 +9,28 @@ const InterviewComponent = () => {
   const [phase, setPhase] = useState('interview'); // or 'completed'
 
   const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  e.preventDefault();
+  if (!input.trim()) return;
 
-    const updatedConversation = [...conversation, { role: 'user', content: input }];
-    setConversation(updatedConversation);
-    setInput('');
-    setLoading(true);
+  const updatedConversation = [...conversation, { role: 'user', content: input }];
+  setConversation(updatedConversation);
+  setInput('');
+  setLoading(true);
 
-    try {
-      const res = await axios.post('/api/interview', { conversation: updatedConversation, newmessage:input });
-      const reply = res.data.response;
-      setConversation([...updatedConversation, { role: 'assistant', content: reply }]);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const res = await axios.post('/api/interview', {
+      conversation,
+      newMessage: input
+    });
+    const reply = res.data.reply;
+    setConversation([...updatedConversation, { role: 'assistant', content: reply }]);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleScore = async () => {
     setLoading(true);
