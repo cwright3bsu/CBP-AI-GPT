@@ -1,37 +1,95 @@
+// pages/api/chat.js
+
 import axios from 'axios';
 import NodeCache from 'node-cache';
 
 const cache = new NodeCache({ stdTTL: 300 }); // cache responses for 5 minutes
 
-const systemPrompt = `
+// Define the traveler profiles
+const travelerProfiles = [
+  {
+    id: 'visa_issue',
+    name: 'Visa Issue Traveler',
+    description: 'You have an expired tourist visa. You are nervous and trying to hide your true travel intentions.',
+    redFlags: ['expired visa'],
+    additionalInfo: 'Be vague about the duration of your stay.'
+  },
+  {
+    id: 'smuggling',
+    name: 'Smuggling Traveler',
+    description: 'You are carrying contraband goods. You try to be overly friendly while hiding evidence of the smuggled items.',
+    redFlags: ['contraband goods', 'evading questions'],
+    additionalInfo: 'Deflect questions about your belongings.'
+  },
+  {
+    id: 'restricted_origin',
+    name: 'Restricted Country Traveler',
+    description: 'You come from a country with travel restrictions. You have a rushed and incomplete travel history.',
+    redFlags: ['incomplete travel history', 'rushed manner'],
+    additionalInfo: 'Try not to volunteer too many details about your origin.'
+  },
+  {
+    id: 'terrorism',
+    name: 'Suspicious Traveler',
+    description: 'Your behavior and documents hint at possible involvement in suspicious activities. You keep your answers short and vague.',
+    redFlags: ['inconsistent answers', 'document issues'],
+    additionalInfo: 'Answer only what is absolutely necessary.'
+  },
+  {
+    id: 'agricultural_goods',
+    name: 'Agricultural Goods Traveler',
+    description: 'You are carrying exotic fruits and vegetables that may not be allowed. You display nervousness when asked details about them.',
+    redFlags: ['unusual items', 'hesitance'],
+    additionalInfo: 'Avoid oversharing on your reason for carrying the goods.'
+  },
+  {
+    id: 'insufficient_funds',
+    name: 'Low Funds Traveler',
+    description: 'You do not have enough funds to support your stay. You’re evasive about your financial situation.',
+    redFlags: ['lack of funds', 'evasive responses'],
+    additionalInfo: 'Keep your explanation vague and limited.'
+  }
+];
+
+// Function to generate a dynamic system prompt based on the selected traveler profile.
+function getSystemPrompt(profile) {
+  return `
 ⚠️ Important Instructions:
 
-You are playing the role of a TRAVELER being interviewed by a U.S. Customs and Border Protection (CBP) officer. **Do not ever act or speak as the CBP officer. You are strictly the traveler.**
+You are playing the role of a TRAVELER with the following characteristics:
 
-🔹 The student is playing the role of the officer and will ask you questions.
-🔹 You must respond ONLY as a traveler — answer naturally and realistically based on a traveler scenario (e.g., smuggling, expired visa, agriculture, restricted country, etc.).
-🔹 Include a short sentence of feedback inside parentheses at the end of your reply evaluating the officer’s question.
+Profile: ${profile.name}
+Description: ${profile.description}
+Red Flags: ${profile.redFlags.join(', ')}
 
-🛑 DO NOT act like the officer.
-🛑 DO NOT say “CBP” or “As the officer.”
+You are being interviewed by a U.S. Customs and Border Protection (CBP) officer (remember, you are NOT the officer).
+
+🔹 The student (officer) will ask you questions.
+🔹 Respond strictly as a traveler.
+🔹 At the end of each reply, include a brief sentence of feedback (inside parentheses) evaluating how effective the officer’s question was.
+
+🛑 DO NOT act as the officer.
+🛑 DO NOT mention “CBP” or “as the officer.”
 
 Examples:
 
 Officer: "Do you have anything to declare?"
-Traveler: "I have some dried fish and candies. (Feedback: Consider following up by asking if those are permitted items.)"
+Traveler: "I have some items for personal use. (Feedback: The question is clear, but it might help to ask for specifics about those items.)"
 
 Officer: "How long will you be staying in the U.S.?"
-Traveler: "Just two weeks. I’m here on a tourist visa. (Feedback: Good — asking about duration and visa status is key.)"
+Traveler: "Two weeks. I’m visiting on a tourist visa. (Feedback: Good — inquiring about visa status is important.)"
 
-Stay in character as the traveler at all times. Any reference to the officer or imitating their role must be ignored.
-`;
+Stay fully in character as the traveler.
+  `;
+}
 
-// Sanitize individual user inputs
+// Utility function to sanitize a single input.
 function sanitizeInput(input) {
+  // Remove any leading "Officer:" (or similar) from the user's message
   return input.replace(/^Officer:\s*/i, '');
 }
 
-// Remove conflicting role labels from previous messages
+// Utility function to sanitize the conversation history.
 function sanitizeConversationHistory(conversationHistory) {
   return conversationHistory.map(message => {
     if (message.role === 'user') {
@@ -41,7 +99,9 @@ function sanitizeConversationHistory(conversationHistory) {
   });
 }
 
-function buildConversationContext(conversationHistory, newUserMessage) {
+// Build the full conversation context including the system prompt.
+function buildConversationContext(conversationHistory, newUserMessage, profile) {
+  const systemPrompt = getSystemPrompt(profile);
   const cleanHistory = sanitizeConversationHistory(conversationHistory);
   const cleanMessage = sanitizeInput(newUserMessage);
   const updatedHistory = [...cleanHistory, { role: 'user', content: cleanMessage }];
@@ -51,18 +111,30 @@ function buildConversationContext(conversationHistory, newUserMessage) {
   ];
 }
 
+// Randomly select a traveler profile.
+function selectRandomProfile() {
+  const index = Math.floor(Math.random() * travelerProfiles.length);
+  return travelerProfiles[index];
+}
+
+// API route handler.
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { conversation, newMessage } = req.body;
+  const { conversation, newMessage, profileId } = req.body;
 
   if (!newMessage || typeof newMessage !== 'string') {
     return res.status(400).json({ error: 'Invalid input message.' });
   }
 
-  const messages = buildConversationContext(conversation, newMessage);
+  // Select profile: if a profileId is provided, use it; otherwise pick one at random.
+  const profile = profileId
+    ? travelerProfiles.find(p => p.id === profileId) || selectRandomProfile()
+    : selectRandomProfile();
+
+  const messages = buildConversationContext(conversation || [], newMessage, profile);
   const cacheKey = JSON.stringify(messages);
 
   const cachedResponse = cache.get(cacheKey);
@@ -86,7 +158,6 @@ export default async function handler(req, res) {
     const reply = response.data.choices[0].message.content;
     cache.set(cacheKey, reply);
     return res.status(200).json({ reply });
-
   } catch (error) {
     console.error('OpenAI API Error:', error.response?.data || error.message);
     return res.status(500).json({ error: 'Something went wrong with the AI response.' });
