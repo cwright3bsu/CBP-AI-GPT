@@ -4,20 +4,23 @@ import ProgressIndicator from './ProgressIndicator';
 
 const InterviewComponent = () => {
   const [conversation, setConversation] = useState([]);
-  const [currentInput, setCurrentInput] = useState('');
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [phase, setPhase] = useState('interview');
+  const [phase, setPhase] = useState('interview'); // or 'completed'
 
-  const handleSubmit = async (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    const newConversation = [...conversation, { role: 'user', content: currentInput }];
-    setConversation(newConversation);
-    setCurrentInput('');
+    if (!input.trim()) return;
+
+    const updatedConversation = [...conversation, { role: 'user', content: input }];
+    setConversation(updatedConversation);
+    setInput('');
     setLoading(true);
 
     try {
-      const res = await axios.post('/api/interviewAPI', { conversation: newConversation });
-      setConversation([...newConversation, { role: 'agent', content: res.data.response }]);
+      const res = await axios.post('/api/interviewAPI', { conversation: updatedConversation });
+      const reply = res.data.response;
+      setConversation([...updatedConversation, { role: 'assistant', content: reply }]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -29,36 +32,41 @@ const InterviewComponent = () => {
     setLoading(true);
     try {
       const res = await axios.post('/api/score', { conversation });
-      alert("Score and Recommendations:\n" + res.data.score);
+      alert("Score & Feedback:\n\n" + res.data.score);
       setPhase('completed');
     } catch (err) {
       console.error(err);
-      alert("Error scoring conversation");
+      alert("Error scoring conversation.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div>
-      <ProgressIndicator phase={phase} conversationLength={conversation.length} />
-      <div style={{border: '1px solid #ccc', padding: '10px', minHeight: '200px'}}>
+    <div className="max-w-2xl mx-auto p-4 font-sans">
+      <h1 className="text-xl font-bold mb-4">CBP GPT Interview Simulator</h1>
+
+      <ProgressIndicator phase={phase} count={conversation.length} />
+
+      <div className="border rounded p-3 h-96 overflow-y-auto bg-gray-50 mb-3">
         {conversation.map((msg, idx) => (
-          <p key={idx}><strong>{msg.role}:</strong> {msg.content}</p>
+          <div key={idx} className={`mb-2 ${msg.role === 'user' ? 'text-blue-700' : 'text-black'}`}>
+            <strong>{msg.role === 'user' ? 'Officer' : 'Traveler'}:</strong> {msg.content}
+          </div>
         ))}
-        {loading && <p>Loading...</p>}
+        {loading && <p><em>Generating response...</em></p>}
       </div>
+
       {phase === 'interview' && (
-        <form onSubmit={handleSubmit}>
-          <input 
-            type="text" 
-            value={currentInput} 
-            onChange={(e) => setCurrentInput(e.target.value)} 
-            placeholder="Enter your response" 
-            style={{width: '80%'}}
+        <form onSubmit={handleSend} className="flex gap-2">
+          <input
+            className="border p-2 flex-1"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask your next question..."
           />
-          <button type="submit">Send</button>
-          <button type="button" onClick={handleScore}>Finish Interview & Score</button>
+          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
+          <button type="button" onClick={handleScore} className="bg-green-600 text-white px-4 py-2 rounded">Finish</button>
         </form>
       )}
     </div>
